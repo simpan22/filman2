@@ -1,0 +1,11 @@
+[package]
+name = "filman2"
+version = "0.2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tui = "0.19"
+crossterm = "0.25"
+prompter = { git = "ssh://git@github.com/simpan22/prompter.git" }
