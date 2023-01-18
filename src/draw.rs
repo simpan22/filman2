@@ -2,7 +2,7 @@ use crossterm::terminal::enable_raw_mode;
 use crossterm::{event::EnableMouseCapture, execute, terminal::EnterAlternateScreen};
 use std::io::Stdout;
 use std::io::{self, stdout};
-use tui::layout::{Constraint, Layout, Alignment};
+use tui::layout::{Alignment, Constraint, Layout};
 use tui::style::{Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{List, ListItem, ListState, Paragraph, Wrap};
@@ -30,6 +30,7 @@ impl From<State> for RenderState {
         let command = match &other.mode {
             Mode::NormalMode => None,
             Mode::CommandMode(pr) => Some(pr.result().to_string()),
+            Mode::ShellCommandMode(pr) => Some(pr.result().to_string()),
         };
 
         RenderState {
@@ -38,13 +39,13 @@ impl From<State> for RenderState {
                 .iter()
                 .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
                 .collect(),
-            selected_in_pwd: Some(other.selected_in_pwd()),
+            selected_in_pwd: Some(other.selected_index_in_pwd()),
             files_in_parent: other
                 .files_in_parent()
                 .iter()
                 .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
                 .collect(),
-            selected_in_parent: other.selected_in_parent(),
+            selected_in_parent: other.selected_index_in_parent(),
             command,
         }
     }
@@ -118,7 +119,7 @@ pub fn draw(
 
         let command_window = Paragraph::new(command_window_text)
             .alignment(Alignment::Left)
-            .wrap(Wrap{trim: true});
+            .wrap(Wrap { trim: true });
 
         f.render_stateful_widget(parent, main_window_rects[0], &mut parents_state);
         f.render_stateful_widget(files, main_window_rects[1], &mut files_state);
