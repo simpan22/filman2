@@ -9,3 +9,4 @@ edition = "2021"
 tui = "0.19"
 crossterm = "0.25"
 prompter = { git = "ssh://git@github.com/simpan22/prompter.git" }
+thiserror = "1.0.38"

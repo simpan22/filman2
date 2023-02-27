@@ -1,5 +1,6 @@
 mod commands;
 mod draw;
+mod error;
 pub mod state;
 
 use commands::{execute_command, execute_shell_command};
@@ -11,7 +12,10 @@ use crossterm::{
 use draw::{create_terminal, draw};
 use prompter::PromptReader;
 
-use std::{collections::HashMap, io};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
 use state::{Mode, State};
 
@@ -26,14 +30,24 @@ fn main() -> Result<(), io::Error> {
         pwd,
         selected_in_pwd: selected,
         mode: state::Mode::NormalMode,
+        yanked: vec![],
+        multi_select: HashSet::new(),
+        error_message: None,
     };
 
     loop {
-        draw(&state.clone().into(), &mut terminal)?;
+        draw(
+            &state
+                .clone()
+                .try_into()
+                .expect("Failed to generate rendering state"),
+            &mut terminal,
+        )?;
         let mut command_to_run: Option<String> = None;
         let mut shell_command_to_run: Option<String> = None;
-        match read()? {
-            Event::Key(key) => match &mut state.mode {
+        if let Event::Key(key) = read()? {
+            state.error_message = None;
+            match &mut state.mode {
                 Mode::ShellCommandMode(reader) => {
                     match key.code {
                         KeyCode::Char(c) => reader.next_key(c.into()),
@@ -78,13 +92,27 @@ fn main() -> Result<(), io::Error> {
                     KeyCode::Char('q') => break,
                     KeyCode::Char('j') => state.try_next(),
                     KeyCode::Char('k') => state.try_prev(),
-                    KeyCode::Char('h') => state.try_up(),
+                    KeyCode::Char('h') => state.try_up().unwrap_or_else(|_| {
+                        state.error_message = Some("Failed to go to parent directory".into());
+                    }),
                     KeyCode::Char('l') => state.try_down(),
                     KeyCode::Char('D') => {
                         state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
                             &format!(":delete {}", state.filename_of_selected()),
                             None,
                         ))
+                    }
+                    KeyCode::Char(' ') => {
+                        command_to_run =
+                            Some(format!(":toggle_select {}", state.filename_of_selected()));
+                        state.try_next();
+                    }
+                    KeyCode::Char('y') => {
+                        // TODO: If multiselect yank with all selected as arguments
+                        command_to_run = Some(format!(":yank {}", state.filename_of_selected()));
+                    }
+                    KeyCode::Char('p') => {
+                        command_to_run = Some(":paste".into());
                     }
                     KeyCode::Char('A') => {
                         state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
@@ -103,15 +131,21 @@ fn main() -> Result<(), io::Error> {
 
                     _ => {}
                 },
-            },
-            _ => {}
+            }
         }
 
         if let Some(cmd) = command_to_run {
-            execute_command(&cmd, &mut state).unwrap();
+            match execute_command(&cmd, &mut state) {
+                Err(e) => state.error_message = Some(e.to_string()),
+                _ => {}
+            }
         }
+
         if let Some(cmd) = shell_command_to_run {
-            execute_shell_command(&cmd).unwrap();
+            match execute_shell_command(&cmd) {
+                Err(e) => state.error_message = Some(e.to_string()),
+                _ => {}
+            }
         }
     }
 

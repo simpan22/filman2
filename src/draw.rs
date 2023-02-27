@@ -1,5 +1,6 @@
 use crossterm::terminal::enable_raw_mode;
 use crossterm::{event::EnableMouseCapture, execute, terminal::EnterAlternateScreen};
+use std::collections::HashSet;
 use std::io::Stdout;
 use std::io::{self, stdout};
 use tui::layout::{Alignment, Constraint, Layout};
@@ -12,6 +13,7 @@ use tui::{
     Terminal,
 };
 
+use crate::error::FilmanError;
 use crate::state::Mode;
 use crate::State;
 
@@ -19,21 +21,26 @@ pub struct RenderState {
     pub files_in_pwd: Vec<String>,
     pub selected_in_pwd: Option<usize>,
 
+    pub multi_select: HashSet<String>,
+
     pub files_in_parent: Vec<String>,
     pub selected_in_parent: Option<usize>,
 
     pub command: Option<String>,
+    pub error_message: Option<String>,
 }
 
-impl From<State> for RenderState {
-    fn from(other: State) -> Self {
+impl TryFrom<State> for RenderState {
+    type Error = FilmanError;
+
+    fn try_from(other: State) -> Result<Self, FilmanError> {
         let command = match &other.mode {
             Mode::NormalMode => None,
             Mode::CommandMode(pr) => Some(pr.result().to_string()),
             Mode::ShellCommandMode(pr) => Some(pr.result().to_string()),
         };
 
-        RenderState {
+        Ok(RenderState {
             files_in_pwd: other
                 .files_in_pwd()
                 .iter()
@@ -41,13 +48,20 @@ impl From<State> for RenderState {
                 .collect(),
             selected_in_pwd: Some(other.selected_index_in_pwd()),
             files_in_parent: other
-                .files_in_parent()
+                .files_in_parent()?
                 .iter()
                 .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
                 .collect(),
-            selected_in_parent: other.selected_index_in_parent(),
+            selected_in_parent: other.selected_index_in_parent()?,
             command,
-        }
+            multi_select: other
+                .multi_select
+                .iter()
+                .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
+                .collect(),
+
+            error_message: other.error_message,
+        })
     }
 }
 
@@ -87,7 +101,15 @@ pub fn draw(
         let current_list_items: Vec<ListItem> = state
             .files_in_pwd
             .iter()
-            .map(|x| ListItem::new(x.to_string()))
+            .map(|x| {
+                let bg_color = if state.multi_select.contains(x) {
+                    tui::style::Color::Gray
+                } else {
+                    tui::style::Color::Black
+                };
+
+                ListItem::new(x.to_string()).style(Style::default().bg(bg_color))
+            })
             .collect();
 
         let parent_list_items: Vec<ListItem> = state
@@ -113,9 +135,12 @@ pub fn draw(
         let mut parents_state = ListState::default();
         parents_state.select(state.selected_in_parent);
 
-        let command_window_text = vec![Spans::from(vec![Span::raw(
-            state.command.clone().unwrap_or("".into()),
-        )])];
+        let command_window_string = state
+            .error_message
+            .clone()
+            .unwrap_or(state.command.clone().unwrap_or("".to_string()));
+
+        let command_window_text = vec![Spans::from(vec![Span::raw(command_window_string)])];
 
         let command_window = Paragraph::new(command_window_text)
             .alignment(Alignment::Left)
