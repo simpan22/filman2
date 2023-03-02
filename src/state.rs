@@ -22,6 +22,7 @@ pub struct State {
     pub selected_in_pwd: HashMap<PathBuf, usize>,
     pub mode: Mode,
 
+    pub file_contents: Option<String>,
     pub yanked: Vec<PathBuf>,
     pub multi_select: HashSet<PathBuf>,
     pub error_message: Option<String>,
@@ -58,12 +59,11 @@ impl State {
         Ok(())
     }
 
-    pub fn parent(&self) -> Option<&std::path::Path> {
-        self.pwd.parent()
-    }
-
     pub fn path_of_selected(&self) -> Result<PathBuf, FilmanError> {
-        Ok(self.files_in_pwd()?[self.selected_index_in_pwd()].clone())
+        let selected_index = self.selected_index_in_pwd();
+        let files = self.files_in_pwd()?;
+
+        Ok(files[selected_index].clone())
     }
 
     pub fn path_of_parent(&self) -> Result<PathBuf, FilmanError> {
@@ -105,5 +105,11 @@ impl State {
 
     pub fn filename_of_selected(&self) -> Result<String, FilmanError> {
         Ok(self.path_of_selected()?.filename()?.to_string())
+    }
+
+    pub fn sync_file_contents(&mut self) {
+        if let Some(path) = self.path_of_selected().ok() {
+            self.file_contents = fs::read_to_string(path).ok();
+        }
     }
 }

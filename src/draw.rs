@@ -34,6 +34,8 @@ pub struct RenderState<'a> {
     pub files_in_parent: Vec<String>,
     pub selected_in_parent: Option<usize>,
 
+    pub preview: &'a str,
+
     pub command: Option<String>,
     pub error_message: Option<&'a str>,
 }
@@ -73,6 +75,7 @@ impl<'a> TryFrom<&'a State> for RenderState<'a> {
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
                 .collect(),
 
+            preview: other.file_contents.as_deref().unwrap_or("Binary file"),
             error_message: other.error_message.as_deref(),
         })
     }
@@ -124,7 +127,9 @@ pub fn draw(
             .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
         // Preview window
-        let preview = Block::default().title("Preview").borders(Borders::ALL);
+        let preview = Paragraph::new(state.preview)
+            .block(Block::default().title("Preview").borders(Borders::ALL))
+            .wrap(Wrap { trim: false });
 
         // Files table
         let table = Table::new(

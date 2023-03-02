@@ -11,6 +11,7 @@ use crossterm::{
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
 use draw::{create_terminal, draw, RenderState};
+use path::Path;
 use prompter::PromptReader;
 
 use std::{
@@ -84,18 +85,29 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             state.error_message = Some("Failed to go into directory".into());
         }),
         KeyCode::Char('D') => {
-            if let Ok(filename) = state.filename_of_selected() {
-                state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
-                    &format!(":delete {}", filename),
-                    None,
-                ))
+            let args = if state.multi_select.len() != 0 {
+                state
+                    .multi_select
+                    .iter()
+                    .map(|x| x.full_path_str())
+                    .collect::<Result<Vec<&str>, _>>()
+                    .unwrap()
+                    .join(" ")
             } else {
-                state.error_message = Some("Faled to read filename".into());
-            }
+                if let Ok(filename) = state.filename_of_selected() {
+                    filename
+                } else {
+                    state.error_message = Some("Faled to read filename".into());
+                    return vec![];
+                }
+            };
+            state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
+                &format!(":delete {}", args),
+                None,
+            ))
         }
         KeyCode::Char(' ') => {
             if let Ok(filename) = state.filename_of_selected() {
-                // command_to_run = Some(format!(":toggle_select {}", filename));
                 state.try_next().unwrap_or_else(|_| {
                     state.error_message = Some("Failed to advance cursor".into())
                 });
@@ -107,7 +119,6 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
         KeyCode::Char('y') => {
             if let Ok(filename) = state.filename_of_selected() {
                 // TODO: If multiselect yank with all selected as arguments
-                // command_to_run = Some(format!(":yank {}", filename));
                 return vec![Action::Command(format!(":yank {}", filename))];
             } else {
                 state.error_message = Some("Faled to read filename".into());
@@ -139,7 +150,6 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
     vec![]
 }
 
-
 fn main() -> Result<(), io::Error> {
     let mut terminal = create_terminal()?;
 
@@ -154,9 +164,14 @@ fn main() -> Result<(), io::Error> {
         yanked: vec![],
         multi_select: HashSet::new(),
         error_message: None,
+        file_contents: Some("Example file contents".into()),
     };
 
+    // Initialize preview window
+    state.sync_file_contents();
+
     'main: loop {
+        state.sync_file_contents();
         let render_state: RenderState = (&state)
             .try_into()
             .expect("Failed to generate render state");

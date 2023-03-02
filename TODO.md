@@ -1,12 +1,9 @@
-# TODO:
- - File stats in right column (e.g. size) maybe custom command?
- - Config for keybindings and settings (yaml)
- - Command history
- - Don't allow overwriting on paste
-
-## Commands
+# Planned features
  - Multi select delete
  - Multi select yank
-
-## Features
  - Multiple windows
+ - Config for keybindings and settings (yaml)
+ - Command history (in prompt reader)
+ - Custom command for preview windows
+ - Custom command for file size info
+ - Scroll in preview window

@@ -17,20 +17,20 @@ fn rename(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
 }
 
 fn delete(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
-    if args.len() != 1 {
+    if args.len() == 0 {
         return Err(FilmanError::CommandError(
-            ":delete takes one argument".into(),
+            ":delete takes at least one argument".into(),
         ));
     }
+    for arg in args {
+        let path = state.path_of_parent()?.join(arg);
+        if path.is_dir() {
+            std::fs::remove_dir(path).map_err(|e| FilmanError::CommandError(e.to_string()))?;
+        } else {
+            std::fs::remove_file(path).map_err(|e| FilmanError::CommandError(e.to_string()))?;
+        }
 
-    let path = state.path_of_parent()?.join(args[0]);
-
-    if path.is_dir() {
-        std::fs::remove_dir(path).map_err(|e| FilmanError::CommandError(e.to_string()))?;
-    } else {
-        std::fs::remove_file(path).map_err(|e| FilmanError::CommandError(e.to_string()))?;
     }
-
     Ok(())
 }
 
