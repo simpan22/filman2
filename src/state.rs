@@ -7,6 +7,7 @@ use std::{
 use prompter::PromptReader;
 
 use crate::error::FilmanError;
+use crate::path::Path;
 
 #[derive(Clone)]
 pub enum Mode {
@@ -27,24 +28,27 @@ pub struct State {
 }
 
 impl State {
-    pub fn try_next(&mut self) {
+    pub fn try_next(&mut self) -> Result<(), FilmanError> {
         let current = self.selected_index_in_pwd();
-        if current != self.files_in_pwd().len() - 1 {
+        if current != self.files_in_pwd()?.len() - 1 {
             self.selected_in_pwd.insert(self.pwd.clone(), current + 1);
         }
+        Ok(())
     }
 
-    pub fn try_prev(&mut self) {
+    pub fn try_prev(&mut self) -> Result<(), FilmanError> {
         let current = self.selected_index_in_pwd();
         if current != 0 {
             self.selected_in_pwd.insert(self.pwd.clone(), current - 1);
         }
+        Ok(())
     }
 
-    pub fn try_down(&mut self) {
-        if self.path_of_selected().is_dir() {
-            self.pwd = self.path_of_selected()
+    pub fn try_down(&mut self) -> Result<(), FilmanError> {
+        if self.path_of_selected()?.is_dir() {
+            self.pwd = self.path_of_selected()?;
         }
+        Ok(())
     }
 
     pub fn try_up(&mut self) -> Result<(), FilmanError> {
@@ -54,17 +58,17 @@ impl State {
         Ok(())
     }
 
-    pub fn parent(&self) -> Option<PathBuf> {
-        self.pwd.parent().map(|x| x.to_path_buf())
+    pub fn parent(&self) -> Option<&std::path::Path> {
+        self.pwd.parent()
     }
 
-    pub fn path_of_selected(&self) -> PathBuf {
-        self.files_in_pwd()[self.selected_index_in_pwd()].clone()
+    pub fn path_of_selected(&self) -> Result<PathBuf, FilmanError> {
+        Ok(self.files_in_pwd()?[self.selected_index_in_pwd()].clone())
     }
 
     pub fn path_of_parent(&self) -> Result<PathBuf, FilmanError> {
         Ok(self
-            .path_of_selected()
+            .path_of_selected()?
             .parent()
             .ok_or(FilmanError::NoParentError)?
             .to_path_buf())
@@ -80,25 +84,26 @@ impl State {
     }
 
     pub fn files_in_parent(&self) -> Result<Vec<PathBuf>, FilmanError> {
-        if let Some(parent) = self.parent() {
-            let paths = fs::read_dir(parent)?;
-            Ok(paths.into_iter().map(|x| x.unwrap().path()).collect())
+        if let Some(parent) = self.pwd.parent() {
+            let path_iter = fs::read_dir(parent)?;
+            let path_bufs = path_iter
+                .map(|x| x.map(|y| y.path()))
+                .collect::<Result<Vec<PathBuf>, _>>()?;
+            Ok(path_bufs)
         } else {
             Ok(vec![])
         }
     }
 
-    pub fn files_in_pwd(&self) -> Vec<PathBuf> {
-        let paths = fs::read_dir(self.pwd.clone()).unwrap();
-        paths.into_iter().map(|x| x.unwrap().path()).collect()
+    pub fn files_in_pwd(&self) -> Result<Vec<PathBuf>, FilmanError> {
+        let paths = fs::read_dir(&self.pwd)?;
+        Ok(paths
+            .into_iter()
+            .map(|x| x.map(|y| y.path()))
+            .collect::<std::io::Result<Vec<PathBuf>>>()?)
     }
 
-    pub fn filename_of_selected(&self) -> String {
-        self.path_of_selected()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string()
+    pub fn filename_of_selected(&self) -> Result<String, FilmanError> {
+        Ok(self.path_of_selected()?.filename()?.to_string())
     }
 }

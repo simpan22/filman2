@@ -1,15 +1,16 @@
 mod commands;
 mod draw;
 mod error;
+mod path;
 pub mod state;
 
 use commands::{execute_command, execute_shell_command};
 use crossterm::{
-    event::{read, DisableMouseCapture, Event, KeyCode},
+    event::{read, DisableMouseCapture, Event, KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
-use draw::{create_terminal, draw};
+use draw::{create_terminal, draw, RenderState};
 use prompter::PromptReader;
 
 use std::{
@@ -18,6 +19,126 @@ use std::{
 };
 
 use state::{Mode, State};
+
+enum Action {
+    ShellCommand(String),
+    Command(String),
+    ModeSwitch(Mode),
+    Quit,
+}
+
+fn shell_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Action> {
+    match key.code {
+        KeyCode::Char(c) => reader.next_key(c.into()),
+        KeyCode::Enter => reader.next_key(prompter::keycodes::KeyCode::Enter),
+        KeyCode::Left => reader.next_key(prompter::keycodes::KeyCode::Left),
+        KeyCode::Right => reader.next_key(prompter::keycodes::KeyCode::Right),
+        KeyCode::Backspace => reader.next_key(prompter::keycodes::KeyCode::Backspace),
+        KeyCode::Delete => reader.next_key(prompter::keycodes::KeyCode::Delete),
+        _ => {}
+    }
+
+    if reader.done() {
+        vec![
+            Action::ShellCommand(reader.result().to_string()),
+            Action::ModeSwitch(Mode::NormalMode),
+        ]
+    } else {
+        vec![]
+    }
+}
+
+fn command_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Action> {
+    match key.code {
+        KeyCode::Char(c) => reader.next_key(c.into()),
+        KeyCode::Enter => reader.next_key(prompter::keycodes::KeyCode::Enter),
+        KeyCode::Left => reader.next_key(prompter::keycodes::KeyCode::Left),
+        KeyCode::Right => reader.next_key(prompter::keycodes::KeyCode::Right),
+        KeyCode::Backspace => reader.next_key(prompter::keycodes::KeyCode::Backspace),
+        KeyCode::Delete => reader.next_key(prompter::keycodes::KeyCode::Delete),
+        _ => {}
+    }
+
+    if reader.done() {
+        vec![
+            Action::Command(reader.result().to_string()),
+            Action::ModeSwitch(Mode::NormalMode),
+        ]
+    } else {
+        vec![]
+    }
+}
+fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
+    match key.code {
+        KeyCode::Char('q') => return vec![Action::Quit],
+        KeyCode::Char('j') => state.try_next().unwrap_or_else(|_| {
+            state.error_message = Some("Failed to navigate".into());
+        }),
+        KeyCode::Char('k') => state.try_prev().unwrap_or_else(|_| {
+            state.error_message = Some("Faled to navigate".into());
+        }),
+        KeyCode::Char('h') => state.try_up().unwrap_or_else(|_| {
+            state.error_message = Some("Failed to go to parent dir".into());
+        }),
+        KeyCode::Char('l') => state.try_down().unwrap_or_else(|_| {
+            state.error_message = Some("Failed to go into directory".into());
+        }),
+        KeyCode::Char('D') => {
+            if let Ok(filename) = state.filename_of_selected() {
+                state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
+                    &format!(":delete {}", filename),
+                    None,
+                ))
+            } else {
+                state.error_message = Some("Faled to read filename".into());
+            }
+        }
+        KeyCode::Char(' ') => {
+            if let Ok(filename) = state.filename_of_selected() {
+                // command_to_run = Some(format!(":toggle_select {}", filename));
+                state.try_next().unwrap_or_else(|_| {
+                    state.error_message = Some("Failed to advance cursor".into())
+                });
+                return vec![Action::Command(format!(":toggle_select {}", filename))];
+            } else {
+                state.error_message = Some("Faled to read filename".into());
+            }
+        }
+        KeyCode::Char('y') => {
+            if let Ok(filename) = state.filename_of_selected() {
+                // TODO: If multiselect yank with all selected as arguments
+                // command_to_run = Some(format!(":yank {}", filename));
+                return vec![Action::Command(format!(":yank {}", filename))];
+            } else {
+                state.error_message = Some("Faled to read filename".into());
+            }
+        }
+        KeyCode::Char('p') => {
+            return vec![Action::Command(":paste".into())];
+        }
+        KeyCode::Char('A') => {
+            if let Ok(filename) = state.filename_of_selected() {
+                state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
+                    &format!(":rename {}", filename),
+                    None,
+                ))
+            } else {
+                state.error_message = Some("Faled to read filename".into());
+            }
+        }
+        KeyCode::Char(':') => {
+            state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(":", None))
+        }
+        KeyCode::Char('!') => {
+            state.mode = Mode::ShellCommandMode(PromptReader::new_with_placeholder("!", None))
+        }
+
+        _ => {}
+    };
+
+    vec![]
+}
+
 
 fn main() -> Result<(), io::Error> {
     let mut terminal = create_terminal()?;
@@ -35,116 +156,44 @@ fn main() -> Result<(), io::Error> {
         error_message: None,
     };
 
-    loop {
-        draw(
-            &state
-                .clone()
-                .try_into()
-                .expect("Failed to generate rendering state"),
-            &mut terminal,
-        )?;
-        let mut command_to_run: Option<String> = None;
-        let mut shell_command_to_run: Option<String> = None;
+    'main: loop {
+        let render_state: RenderState = (&state)
+            .try_into()
+            .expect("Failed to generate render state");
+
+        draw(&render_state, &mut terminal)?;
+
+        let mut actions = vec![];
+
         if let Event::Key(key) = read()? {
             state.error_message = None;
             match &mut state.mode {
                 Mode::ShellCommandMode(reader) => {
-                    match key.code {
-                        KeyCode::Char(c) => reader.next_key(c.into()),
-                        KeyCode::Enter => reader.next_key(prompter::keycodes::KeyCode::Enter),
-                        KeyCode::Left => reader.next_key(prompter::keycodes::KeyCode::Left),
-                        KeyCode::Right => reader.next_key(prompter::keycodes::KeyCode::Right),
-
-                        KeyCode::Backspace => {
-                            reader.next_key(prompter::keycodes::KeyCode::Backspace)
-                        }
-
-                        KeyCode::Delete => reader.next_key(prompter::keycodes::KeyCode::Delete),
-                        _ => {}
-                    }
-
-                    if reader.done() {
-                        shell_command_to_run = Some(reader.result().to_string());
-                        state.mode = Mode::NormalMode;
-                    }
+                    actions.append(&mut shell_mode_input(&key, reader))
                 }
                 Mode::CommandMode(reader) => {
-                    match key.code {
-                        KeyCode::Char(c) => reader.next_key(c.into()),
-                        KeyCode::Enter => reader.next_key(prompter::keycodes::KeyCode::Enter),
-                        KeyCode::Left => reader.next_key(prompter::keycodes::KeyCode::Left),
-                        KeyCode::Right => reader.next_key(prompter::keycodes::KeyCode::Right),
-
-                        KeyCode::Backspace => {
-                            reader.next_key(prompter::keycodes::KeyCode::Backspace)
-                        }
-
-                        KeyCode::Delete => reader.next_key(prompter::keycodes::KeyCode::Delete),
-                        _ => {}
-                    }
-
-                    if reader.done() {
-                        command_to_run = Some(reader.result().to_string());
-                        state.mode = Mode::NormalMode;
-                    }
+                    actions.append(&mut command_mode_input(&key, reader));
                 }
-                Mode::NormalMode => match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Char('j') => state.try_next(),
-                    KeyCode::Char('k') => state.try_prev(),
-                    KeyCode::Char('h') => state.try_up().unwrap_or_else(|_| {
-                        state.error_message = Some("Failed to go to parent directory".into());
-                    }),
-                    KeyCode::Char('l') => state.try_down(),
-                    KeyCode::Char('D') => {
-                        state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
-                            &format!(":delete {}", state.filename_of_selected()),
-                            None,
-                        ))
-                    }
-                    KeyCode::Char(' ') => {
-                        command_to_run =
-                            Some(format!(":toggle_select {}", state.filename_of_selected()));
-                        state.try_next();
-                    }
-                    KeyCode::Char('y') => {
-                        // TODO: If multiselect yank with all selected as arguments
-                        command_to_run = Some(format!(":yank {}", state.filename_of_selected()));
-                    }
-                    KeyCode::Char('p') => {
-                        command_to_run = Some(":paste".into());
-                    }
-                    KeyCode::Char('A') => {
-                        state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
-                            &format!(":rename {}", state.filename_of_selected()),
-                            None,
-                        ))
-                    }
-                    KeyCode::Char(':') => {
-                        state.mode =
-                            Mode::CommandMode(PromptReader::new_with_placeholder(":", None))
-                    }
-                    KeyCode::Char('!') => {
-                        state.mode =
-                            Mode::ShellCommandMode(PromptReader::new_with_placeholder("!", None))
-                    }
+                Mode::NormalMode => {
+                    actions.append(&mut normal_mode_input(&key, &mut state));
+                }
+            }
+        }
 
+        for action in actions {
+            match action {
+                Action::Quit => break 'main,
+                Action::Command(cmd) => match execute_command(&cmd, &mut state) {
+                    Err(e) => state.error_message = Some(e.to_string()),
                     _ => {}
                 },
-            }
-        }
-
-        if let Some(cmd) = command_to_run {
-            match execute_command(&cmd, &mut state) {
-                Err(e) => state.error_message = Some(e.to_string()),
-                _ => {}
-            }
-        }
-
-        if let Some(cmd) = shell_command_to_run {
-            match execute_shell_command(&cmd) {
-                Err(e) => state.error_message = Some(e.to_string()),
-                _ => {}
+                Action::ShellCommand(cmd) => match execute_shell_command(&cmd) {
+                    Err(e) => state.error_message = Some(e.to_string()),
+                    _ => {}
+                },
+                Action::ModeSwitch(mode) => {
+                    state.mode = mode;
+                }
             }
         }
     }

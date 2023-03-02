@@ -56,10 +56,17 @@ name = "filman2"
 version = "0.2.0"
 dependencies = [
  "crossterm",
+ "human_bytes",
  "prompter",
  "thiserror",
  "tui",
 ]
+
+[[package]]
+name = "human_bytes"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39b528196c838e8b3da8b665e08c30958a6f2ede91d79f2ffcd0d4664b9c64eb"
 
 [[package]]
 name = "libc"

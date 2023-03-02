@@ -1,5 +1,4 @@
 # TODO:
- - Proper error handling
  - File stats in right column (e.g. size) maybe custom command?
  - Config for keybindings and settings (yaml)
  - Command history
@@ -8,3 +7,6 @@
 ## Commands
  - Multi select delete
  - Multi select yank
+
+## Features
+ - Multiple windows

@@ -9,7 +9,7 @@ fn rename(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
         ));
     }
 
-    let old_path = state.path_of_selected();
+    let old_path = state.path_of_selected()?;
     let new_name = state.path_of_parent()?.join(args[0]);
 
     std::fs::rename(old_path, new_name).map_err(|e| FilmanError::CommandError(e.to_string()))?;
@@ -58,16 +58,18 @@ fn paste(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
         ));
     }
 
+    use crate::path::Path;
+
     let parent = state.path_of_parent()?;
     for path in &state.yanked {
-        let filename = path.file_name().unwrap();
+        let filename = path.filename()?;
 
-        let files_in_pwd = state.files_in_pwd();
-        let filenames_in_pwd: Vec<_> = files_in_pwd.iter().map(|x| x.file_name().unwrap()).collect();
+        let files_in_pwd = state.files_in_pwd()?;
+        let filenames_in_pwd = files_in_pwd.iter().map(|x| x.filename()).collect::<Result<Vec<_>, FilmanError>>()?;
 
 
         if filenames_in_pwd.contains(&filename) {
-            return Err(FilmanError::FileOverwriteError(filename.to_str().unwrap().to_string()));
+            return Err(FilmanError::FileOverwriteError(filename.into()));
         }
 
         std::fs::copy(path, parent.join(filename))

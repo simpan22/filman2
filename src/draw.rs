@@ -4,9 +4,9 @@ use std::collections::HashSet;
 use std::io::Stdout;
 use std::io::{self, stdout};
 use tui::layout::{Alignment, Constraint, Layout};
-use tui::style::{Modifier, Style};
+use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
-use tui::widgets::{List, ListItem, ListState, Paragraph, Wrap};
+use tui::widgets::{Cell, List, ListItem, ListState, Paragraph, Row, Table, TableState, Wrap};
 use tui::{
     backend::CrosstermBackend,
     widgets::{Block, Borders},
@@ -14,11 +14,19 @@ use tui::{
 };
 
 use crate::error::FilmanError;
+use crate::path::Path;
 use crate::state::Mode;
 use crate::State;
 
-pub struct RenderState {
-    pub files_in_pwd: Vec<String>,
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct DirectoryEntry {
+    name: String,
+    info: String,
+}
+
+// TODO: Don't leak things like filenames, selected or error_message into this interface
+pub struct RenderState<'a> {
+    pub files_in_pwd: Vec<DirectoryEntry>,
     pub selected_in_pwd: Option<usize>,
 
     pub multi_select: HashSet<String>,
@@ -27,13 +35,13 @@ pub struct RenderState {
     pub selected_in_parent: Option<usize>,
 
     pub command: Option<String>,
-    pub error_message: Option<String>,
+    pub error_message: Option<&'a str>,
 }
 
-impl TryFrom<State> for RenderState {
+impl<'a> TryFrom<&'a State> for RenderState<'a> {
     type Error = FilmanError;
 
-    fn try_from(other: State) -> Result<Self, FilmanError> {
+    fn try_from(other: &'a State) -> Result<Self, FilmanError> {
         let command = match &other.mode {
             Mode::NormalMode => None,
             Mode::CommandMode(pr) => Some(pr.result().to_string()),
@@ -42,10 +50,15 @@ impl TryFrom<State> for RenderState {
 
         Ok(RenderState {
             files_in_pwd: other
-                .files_in_pwd()
+                .files_in_pwd()?
                 .iter()
-                .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
-                .collect(),
+                .map(|x| {
+                    Ok(DirectoryEntry {
+                        name: x.filename()?.to_string(),
+                        info: human_bytes::human_bytes(x.size()? as f64),
+                    })
+                })
+                .collect::<Result<Vec<_>, FilmanError>>()?,
             selected_in_pwd: Some(other.selected_index_in_pwd()),
             files_in_parent: other
                 .files_in_parent()?
@@ -60,7 +73,7 @@ impl TryFrom<State> for RenderState {
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
                 .collect(),
 
-            error_message: other.error_message,
+            error_message: other.error_message.as_deref(),
         })
     }
 }
@@ -79,6 +92,7 @@ pub fn draw(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 ) -> Result<(), io::Error> {
     terminal.draw(|f| {
+        // Layout
         let vertical_rects = Layout::default()
             .direction(tui::layout::Direction::Vertical)
             .margin(0)
@@ -98,20 +112,7 @@ pub fn draw(
             )
             .split(vertical_rects[0]);
 
-        let current_list_items: Vec<ListItem> = state
-            .files_in_pwd
-            .iter()
-            .map(|x| {
-                let bg_color = if state.multi_select.contains(x) {
-                    tui::style::Color::Gray
-                } else {
-                    tui::style::Color::Black
-                };
-
-                ListItem::new(x.to_string()).style(Style::default().bg(bg_color))
-            })
-            .collect();
-
+        // Parent list
         let parent_list_items: Vec<ListItem> = state
             .files_in_parent
             .iter()
@@ -122,32 +123,54 @@ pub fn draw(
             .block(Block::default().title("Parent").borders(Borders::ALL))
             .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
-        let files = List::new(current_list_items)
-            .block(Block::default().title("Files").borders(Borders::ALL))
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .highlight_symbol(">>");
-
+        // Preview window
         let preview = Block::default().title("Preview").borders(Borders::ALL);
 
-        let mut files_state = ListState::default();
+        // Files table
+        let table = Table::new(
+            state
+                .files_in_pwd
+                .clone()
+                .into_iter()
+                .map(|x| {
+                    let bg_color = if state.multi_select.contains(&x.name) {
+                        tui::style::Color::Gray
+                    } else {
+                        tui::style::Color::Black
+                    };
+
+                    Row::new(vec![Cell::from(x.name), Cell::from(x.info)])
+                        .style(Style::default().bg(bg_color))
+                })
+                .collect::<Vec<_>>(),
+        )
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().title("Files").borders(Borders::ALL))
+        .widths(&[Constraint::Percentage(80), Constraint::Percentage(20)])
+        .column_spacing(1)
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+        .highlight_symbol(">>");
+
+        // Select state for list and table
+        let mut files_state = TableState::default();
         files_state.select(state.selected_in_pwd);
 
         let mut parents_state = ListState::default();
         parents_state.select(state.selected_in_parent);
 
+        // Command window
         let command_window_string = state
             .error_message
-            .clone()
-            .unwrap_or(state.command.clone().unwrap_or("".to_string()));
+            .unwrap_or(state.command.as_deref().unwrap_or(""));
 
         let command_window_text = vec![Spans::from(vec![Span::raw(command_window_string)])];
-
         let command_window = Paragraph::new(command_window_text)
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true });
 
+        // Add to window
         f.render_stateful_widget(parent, main_window_rects[0], &mut parents_state);
-        f.render_stateful_widget(files, main_window_rects[1], &mut files_state);
+        f.render_stateful_widget(table, main_window_rects[1], &mut files_state);
         f.render_widget(preview, main_window_rects[2]);
         f.render_widget(command_window, vertical_rects[1]);
     })?;

@@ -19,6 +19,12 @@ pub enum FilmanError {
     ReadDirectoryError(#[from] std::io::Error),
 
     #[error("This would overwrite an existing file: {0}")]
-    FileOverwriteError(String)
+    FileOverwriteError(String),
+
+    #[error("Encountered non unicode characters in filename")]
+    UnicodeError,
+
+    #[error("No filename error")]
+    PathHasNoFilename
 }
 
