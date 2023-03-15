@@ -80,19 +80,19 @@ fn paste(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
 }
 
 fn toggle_select(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
-    if args.is_empty() && args.len() > 1 {
+    if args.is_empty() {
         return Err(FilmanError::CommandError(
-            ":select takes one argument".into(),
+            ":select takes at least one argument".into(),
         ));
     }
-
-    let path = state.path_of_parent()?.join(args[0]);
-    if state.multi_select.contains(&path) {
-        state.multi_select.remove(&path);
-    } else {
-        state.multi_select.insert(path);
+    for arg in args {
+        let path = state.path_of_parent()?.join(arg);
+        if state.multi_select.contains(&path) {
+            state.multi_select.remove(&path);
+        } else {
+            state.multi_select.insert(path);
+        }
     }
-
     Ok(())
 }
 
