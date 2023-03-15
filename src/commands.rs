@@ -24,12 +24,17 @@ fn delete(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
     }
     for arg in args {
         let path = state.path_of_parent()?.join(arg);
+
+        // Remove from selection before deleting
+        if state.multi_select.contains(&path) {
+            state.multi_select.remove(&path);
+        }
+
         if path.is_dir() {
             std::fs::remove_dir(path).map_err(|e| FilmanError::CommandError(e.to_string()))?;
         } else {
             std::fs::remove_file(path).map_err(|e| FilmanError::CommandError(e.to_string()))?;
         }
-
     }
     Ok(())
 }
