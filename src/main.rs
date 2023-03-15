@@ -94,7 +94,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
                     .unwrap()
                     .join(" ")
             } else {
-                if let Ok(filename) = state.filename_of_selected() {
+                if let Ok(Some(filename)) = state.filename_of_selected() {
                     filename
                 } else {
                     state.error_message = Some("Faled to read filename".into());
@@ -107,7 +107,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             ))
         }
         KeyCode::Char(' ') => {
-            if let Ok(filename) = state.filename_of_selected() {
+            if let Ok(Some(filename)) = state.filename_of_selected() {
                 state.try_next().unwrap_or_else(|_| {
                     state.error_message = Some("Failed to advance cursor".into())
                 });
@@ -117,7 +117,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             }
         }
         KeyCode::Char('y') => {
-            if let Ok(filename) = state.filename_of_selected() {
+            if let Ok(Some(filename)) = state.filename_of_selected() {
                 // TODO: If multiselect yank with all selected as arguments
                 return vec![Action::Command(format!(":yank {}", filename))];
             } else {
@@ -128,7 +128,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             return vec![Action::Command(":paste".into())];
         }
         KeyCode::Char('A') => {
-            if let Ok(filename) = state.filename_of_selected() {
+            if let Ok(Some(filename)) = state.filename_of_selected() {
                 state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
                     &format!(":rename {}", filename),
                     None,

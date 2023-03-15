@@ -9,14 +9,14 @@ use prompter::PromptReader;
 use crate::error::FilmanError;
 use crate::path::Path;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Mode {
     NormalMode,
     CommandMode(PromptReader),
     ShellCommandMode(PromptReader),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct State {
     pub pwd: PathBuf,
     pub selected_in_pwd: HashMap<PathBuf, usize>,
@@ -31,7 +31,7 @@ pub struct State {
 impl State {
     pub fn try_next(&mut self) -> Result<(), FilmanError> {
         let current = self.selected_index_in_pwd();
-        if current != self.files_in_pwd()?.len() - 1 {
+        if !self.files_in_pwd()?.is_empty() && current != self.files_in_pwd()?.len() - 1 {
             self.selected_in_pwd.insert(self.pwd.clone(), current + 1);
         }
         Ok(())
@@ -39,16 +39,19 @@ impl State {
 
     pub fn try_prev(&mut self) -> Result<(), FilmanError> {
         let current = self.selected_index_in_pwd();
-        if current != 0 {
+        if !self.files_in_pwd()?.is_empty() && current != 0 {
             self.selected_in_pwd.insert(self.pwd.clone(), current - 1);
         }
         Ok(())
     }
 
     pub fn try_down(&mut self) -> Result<(), FilmanError> {
-        if self.path_of_selected()?.is_dir() {
-            self.pwd = self.path_of_selected()?;
+        if let Some(selected_path) = self.path_of_selected()? {
+            if selected_path.is_dir() {
+                self.pwd = selected_path;
+            }
         }
+
         Ok(())
     }
 
@@ -59,19 +62,15 @@ impl State {
         Ok(())
     }
 
-    pub fn path_of_selected(&self) -> Result<PathBuf, FilmanError> {
+    pub fn path_of_selected(&self) -> Result<Option<PathBuf>, FilmanError> {
         let selected_index = self.selected_index_in_pwd();
         let files = self.files_in_pwd()?;
 
-        Ok(files[selected_index].clone())
-    }
+        if selected_index >= files.len() {
+            return Ok(None)
+        }
 
-    pub fn path_of_parent(&self) -> Result<PathBuf, FilmanError> {
-        Ok(self
-            .path_of_selected()?
-            .parent()
-            .ok_or(FilmanError::NoParentError)?
-            .to_path_buf())
+        Ok(Some(files[selected_index].clone()))
     }
 
     pub fn selected_index_in_pwd(&self) -> usize {
@@ -103,13 +102,20 @@ impl State {
             .collect::<std::io::Result<Vec<PathBuf>>>()?)
     }
 
-    pub fn filename_of_selected(&self) -> Result<String, FilmanError> {
-        Ok(self.path_of_selected()?.filename()?.to_string())
+    pub fn filename_of_selected(&self) -> Result<Option<String>, FilmanError> {
+        
+        if let Some(path_of_selected) = self.path_of_selected()? {
+            Ok(Some(path_of_selected.filename()?.to_string()))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn sync_file_contents(&mut self) {
         if let Some(path) = self.path_of_selected().ok() {
-            self.file_contents = fs::read_to_string(path).ok();
+            if let Some(path) = path {
+                self.file_contents = fs::read_to_string(path).ok();
+            }
         }
     }
 }

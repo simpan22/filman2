@@ -25,6 +25,9 @@ pub enum FilmanError {
     UnicodeError,
 
     #[error("No filename error")]
-    PathHasNoFilename
+    PathHasNoFilename,
+
+    #[error("Directory has no files")]
+    EmptyDirectory
 }
 

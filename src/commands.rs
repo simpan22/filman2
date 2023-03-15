@@ -9,11 +9,14 @@ fn rename(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
         ));
     }
 
-    let old_path = state.path_of_selected()?;
-    let new_name = state.path_of_parent()?.join(args[0]);
+    if let Some(old_path) = state.path_of_selected()? {
+        let new_name = state.pwd.join(args[0]);
+        std::fs::rename(old_path, new_name).map_err(|e| FilmanError::CommandError(e.to_string()))?;
+        Ok(())
+    } else {
+        Err(FilmanError::EmptyDirectory)
+    }
 
-    std::fs::rename(old_path, new_name).map_err(|e| FilmanError::CommandError(e.to_string()))?;
-    Ok(())
 }
 
 fn delete(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
@@ -23,7 +26,7 @@ fn delete(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
         ));
     }
     for arg in args {
-        let path = state.path_of_parent()?.join(arg);
+        let path = state.pwd.join(arg);
 
         // Remove from selection before deleting
         if state.multi_select.contains(&path) {
@@ -49,7 +52,7 @@ fn yank(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
     state.yanked = vec![];
 
     for &arg in args.iter() {
-        let path = state.path_of_parent()?.join(arg);
+        let path = state.pwd.join(arg);
         state.yanked.push(path);
     }
 
@@ -65,7 +68,7 @@ fn paste(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
 
     use crate::path::Path;
 
-    let parent = state.path_of_parent()?;
+    let parent = &state.pwd;
     for path in &state.yanked {
         let filename = path.filename()?;
 
@@ -91,7 +94,7 @@ fn toggle_select(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
         ));
     }
     for arg in args {
-        let path = state.path_of_parent()?.join(arg);
+        let path = state.pwd.join(arg);
         if state.multi_select.contains(&path) {
             state.multi_select.remove(&path);
         } else {
