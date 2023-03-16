@@ -177,7 +177,7 @@ fn main() -> Result<(), io::Error> {
             .try_into()
             .expect("Failed to generate render state");
 
-        eprintln!("State: {:?}", &state);
+        // eprintln!("State: {:?}", &state);
         draw(&render_state, &mut terminal)?;
 
         let mut actions = vec![];

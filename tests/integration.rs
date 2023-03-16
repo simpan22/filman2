@@ -6,62 +6,81 @@ use serial_test::serial;
 use std::{
     collections::{HashMap, HashSet},
     fs::{create_dir, remove_dir_all},
+    path::PathBuf,
 };
 
-fn create_test_state() -> State {
-    let pwd = std::env::current_dir().unwrap();
-    let test_dir = pwd.join("test_env");
-    if let Err(e) = remove_dir_all(test_dir.clone()) {
-        println!("Not removing old test env: {:?}", e);
+struct TestContext {
+    state: State,
+    directory: PathBuf,
+}
+
+impl TestContext {
+    fn new() -> Self {
+        let pwd = std::env::current_dir().unwrap();
+        let test_dir = pwd.join("test_env");
+        if let Err(e) = remove_dir_all(test_dir.clone()) {
+            println!("Not removing old test env: {:?}", e);
+        }
+        create_dir(test_dir.clone()).unwrap();
+        let mut selected = HashMap::new();
+        selected.insert(test_dir.clone(), 0);
+
+        let state = State {
+            pwd: test_dir.clone(),
+            selected_in_pwd: selected,
+            mode: filman2::state::Mode::NormalMode,
+            yanked: HashSet::new(),
+            multi_select: HashSet::new(),
+            error_message: None,
+            file_contents: Some("Example file contents".into()),
+        };
+
+        assert_eq!(state.selected_index_in_pwd(), 0);
+        assert!(state.files_in_pwd().unwrap().is_empty());
+
+        TestContext {
+            state: state,
+            directory: test_dir,
+        }
     }
-    create_dir(test_dir.clone()).unwrap();
-    let mut selected = HashMap::new();
-    selected.insert(test_dir.clone(), 0);
+}
 
-    let state = State {
-        pwd: test_dir.clone(),
-        selected_in_pwd: selected,
-        mode: filman2::state::Mode::NormalMode,
-        yanked: HashSet::new(),
-        multi_select: HashSet::new(),
-        error_message: None,
-        file_contents: Some("Example file contents".into()),
-    };
-
-    assert_eq!(state.selected_index_in_pwd(), 0);
-    assert!(state.files_in_pwd().unwrap().is_empty());
-
-    state
+impl Drop for TestContext {
+    fn drop(&mut self) {
+        if let Err(e) = remove_dir_all(self.directory.clone()) {
+            println!("Not removing old test env: {:?}", e);
+        }
+    }
 }
 
 #[test]
 #[serial]
 fn test_create_file() {
-    let state = create_test_state();
-    execute_shell_command("!touch test.txt", &state.pwd).unwrap();
-    assert!(!state.files_in_pwd().unwrap().is_empty());
+    let ctx = TestContext::new();
+    execute_shell_command("!touch test.txt", &ctx.state.pwd).unwrap();
+    assert!(!ctx.state.files_in_pwd().unwrap().is_empty());
 }
 
 #[test]
 #[serial]
 fn test_crate_delete_file() {
-    let mut state = create_test_state();
-    execute_shell_command("!touch test.txt", &state.pwd).unwrap();
-    assert!(!state.files_in_pwd().unwrap().is_empty());
+    let mut ctx = TestContext::new();
+    execute_shell_command("!touch test.txt", &ctx.state.pwd).unwrap();
+    assert!(!ctx.state.files_in_pwd().unwrap().is_empty());
 
-    execute_command(":delete test.txt", &mut state).unwrap();
-    assert!(state.files_in_pwd().unwrap().is_empty());
+    execute_command(":delete test.txt", &mut ctx.state).unwrap();
+    assert!(ctx.state.files_in_pwd().unwrap().is_empty());
 }
 
 #[test]
 #[serial]
 fn test_rename_file() {
-    let mut state = create_test_state();
-    execute_shell_command("!touch test.txt", &state.pwd).unwrap();
-    assert!(!state.files_in_pwd().unwrap().is_empty());
+    let mut ctx = TestContext::new();
+    execute_shell_command("!touch test.txt", &ctx.state.pwd).unwrap();
+    assert!(!ctx.state.files_in_pwd().unwrap().is_empty());
 
-    execute_command(":rename test2.txt", &mut state).unwrap();
-    let files = state.files_in_pwd().unwrap();
+    execute_command(":rename test2.txt", &mut ctx.state).unwrap();
+    let files = ctx.state.files_in_pwd().unwrap();
     let file_names: Vec<&str> = files
         .iter()
         .map(|x| x.file_name().unwrap().to_str().unwrap())
@@ -73,27 +92,27 @@ fn test_rename_file() {
 #[test]
 #[serial]
 fn yank_paste_test() {
-    let mut state = create_test_state();
+    let mut ctx = TestContext::new();
     // Create two directories: "from" and "to"
-    execute_shell_command("!mkdir from", &state.pwd).unwrap();
-    execute_shell_command("!mkdir to", &state.pwd).unwrap();
+    execute_shell_command("!mkdir from", &ctx.state.pwd).unwrap();
+    execute_shell_command("!mkdir to", &ctx.state.pwd).unwrap();
 
     // Descend into "from"
-    execute_command(":cursor_descend", &mut state).unwrap();
+    execute_command(":cursor_descend", &mut ctx.state).unwrap();
 
     // Create test file and yank it
-    execute_shell_command("!touch test.txt", &state.pwd).unwrap();
-    execute_command(":yank test.txt", &mut state).unwrap();
+    execute_shell_command("!touch test.txt", &ctx.state.pwd).unwrap();
+    execute_command(":yank test.txt", &mut ctx.state).unwrap();
 
     // Go to "to"-directory
-    execute_command(":cursor_ascend", &mut state).unwrap();
-    execute_command(":cursor_down", &mut state).unwrap();
-    execute_command(":cursor_descend", &mut state).unwrap();
+    execute_command(":cursor_ascend", &mut ctx.state).unwrap();
+    execute_command(":cursor_down", &mut ctx.state).unwrap();
+    execute_command(":cursor_descend", &mut ctx.state).unwrap();
 
     // Paste
-    execute_command(":paste", &mut state).unwrap();
+    execute_command(":paste", &mut ctx.state).unwrap();
 
-    let files = state.files_in_pwd().unwrap();
+    let files = ctx.state.files_in_pwd().unwrap();
     let file_names: Vec<&str> = files
         .iter()
         .map(|x| x.file_name().unwrap().to_str().unwrap())
@@ -102,11 +121,11 @@ fn yank_paste_test() {
     assert_eq!(file_names, vec!["test.txt"]);
 
     // Go back to "from" to make sure the file is still there
-    execute_command(":cursor_ascend", &mut state).unwrap();
-    execute_command(":cursor_down", &mut state).unwrap();
-    execute_command(":cursor_descend", &mut state).unwrap();
+    execute_command(":cursor_ascend", &mut ctx.state).unwrap();
+    execute_command(":cursor_down", &mut ctx.state).unwrap();
+    execute_command(":cursor_descend", &mut ctx.state).unwrap();
 
-    let files = state.files_in_pwd().unwrap();
+    let files = ctx.state.files_in_pwd().unwrap();
     let file_names: Vec<&str> = files
         .iter()
         .map(|x| x.file_name().unwrap().to_str().unwrap())
@@ -118,17 +137,18 @@ fn yank_paste_test() {
 #[test]
 #[serial]
 fn multi_select() {
-    let mut state = create_test_state();
+    let mut ctx = TestContext::new();
     // Create three test files
-    execute_shell_command("!touch a", &state.pwd).unwrap();
-    execute_shell_command("!touch b", &state.pwd).unwrap();
-    execute_shell_command("!touch c", &state.pwd).unwrap();
+    execute_shell_command("!touch a", &ctx.state.pwd).unwrap();
+    execute_shell_command("!touch b", &ctx.state.pwd).unwrap();
+    execute_shell_command("!touch c", &ctx.state.pwd).unwrap();
 
     // Select two of them
-    execute_command(":toggle_select a", &mut state).unwrap();
-    execute_command(":toggle_select b", &mut state).unwrap();
+    execute_command(":toggle_select a", &mut ctx.state).unwrap();
+    execute_command(":toggle_select b", &mut ctx.state).unwrap();
 
-    let selected: HashSet<&str> = state
+    let selected: HashSet<&str> = ctx
+        .state
         .multi_select
         .iter()
         .map(|x| x.file_name().unwrap().to_str().unwrap())
