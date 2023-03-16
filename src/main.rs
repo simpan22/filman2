@@ -36,6 +36,7 @@ fn shell_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Action> {
         KeyCode::Right => reader.next_key(prompter::keycodes::KeyCode::Right),
         KeyCode::Backspace => reader.next_key(prompter::keycodes::KeyCode::Backspace),
         KeyCode::Delete => reader.next_key(prompter::keycodes::KeyCode::Delete),
+        KeyCode::Esc => return vec![Action::ModeSwitch(Mode::NormalMode)],
         _ => {}
     }
 
@@ -57,6 +58,7 @@ fn command_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Action> 
         KeyCode::Right => reader.next_key(prompter::keycodes::KeyCode::Right),
         KeyCode::Backspace => reader.next_key(prompter::keycodes::KeyCode::Backspace),
         KeyCode::Delete => reader.next_key(prompter::keycodes::KeyCode::Delete),
+        KeyCode::Esc => return vec![Action::ModeSwitch(Mode::NormalMode)],
         _ => {}
     }
 
@@ -81,6 +83,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
                 state
                     .multi_select
                     .iter()
+                    .filter(|p| p.parent() == Some(&state.pwd))
                     .map(|x| x.full_path_str())
                     .collect::<Result<Vec<&str>, _>>()
                     .unwrap()
@@ -111,6 +114,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
                 state
                     .multi_select
                     .iter()
+                    .filter(|p| p.parent() == Some(&state.pwd))
                     .map(|x| x.full_path_str())
                     .collect::<Result<Vec<&str>, _>>()
                     .unwrap()
@@ -164,21 +168,22 @@ fn main() -> Result<(), io::Error> {
         pwd,
         selected_in_pwd: selected,
         mode: state::Mode::NormalMode,
-        yanked: vec![],
+        yanked: HashSet::new(),
         multi_select: HashSet::new(),
         error_message: None,
         file_contents: Some("Example file contents".into()),
     };
 
     // Initialize preview window
-    state.sync_file_contents();
+    state.sync_preview_file();
 
     'main: loop {
-        state.sync_file_contents();
+        state.sync_preview_file();
         let render_state: RenderState = (&state)
             .try_into()
             .expect("Failed to generate render state");
 
+        eprintln!("State: {:?}", &state);
         draw(&render_state, &mut terminal)?;
 
         let mut actions = vec![];

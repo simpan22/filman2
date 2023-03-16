@@ -1,6 +1,6 @@
 # Planned features
- - Multi select delete
- - Multi select yank
+ - Status (with pwd or whatnot at the top)
+
  - Multiple windows
  - Config for keybindings and settings (yaml)
  - Command history (in prompt reader)

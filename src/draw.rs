@@ -30,6 +30,7 @@ pub struct RenderState<'a> {
     pub selected_in_pwd: Option<usize>,
 
     pub multi_select: HashSet<String>,
+    pub yanked: HashSet<String>,
 
     pub files_in_parent: Vec<String>,
     pub selected_in_parent: Option<usize>,
@@ -69,9 +70,18 @@ impl<'a> TryFrom<&'a State> for RenderState<'a> {
             .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
             .collect();
         let selected_in_parent = other.selected_index_in_parent()?;
+
         let multi_select = other
             .multi_select
             .iter()
+            .filter(|p| p.parent() == Some(&other.pwd))
+            .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
+            .collect();
+
+        let yanked = other
+            .yanked
+            .iter()
+            .filter(|p| p.parent() == Some(&other.pwd))
             .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
             .collect();
 
@@ -79,6 +89,7 @@ impl<'a> TryFrom<&'a State> for RenderState<'a> {
         let error_message = other.error_message.as_deref();
 
         Ok(RenderState {
+            yanked,
             files_in_pwd,
             selected_in_pwd,
             files_in_parent,
@@ -98,6 +109,34 @@ pub fn create_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, io::Error
     let backend = CrosstermBackend::new(stdout);
     let terminal = Terminal::new(backend)?;
     Ok(terminal)
+}
+
+fn format_file(
+    file: &DirectoryEntry,
+    selected: bool,
+    yanked: bool,
+    multi_selected: bool,
+) -> String {
+    let mut ret = String::new();
+
+    if selected {
+        return format!(">> {}", file.name);
+    }
+
+    if yanked {
+        ret += "Y";
+    } else {
+        ret += " ";
+    }
+
+    if multi_selected {
+        ret += "S";
+    } else {
+        ret += " ";
+    }
+    ret += " ";
+    ret += &file.name;
+    ret
 }
 
 pub fn draw(
@@ -148,14 +187,15 @@ pub fn draw(
                 .clone()
                 .into_iter()
                 .map(|x| {
-                    let bg_color = if state.multi_select.contains(&x.name) {
-                        tui::style::Color::Gray
-                    } else {
-                        tui::style::Color::Black
-                    };
+                    let formatted = format_file(
+                        &x,
+                        false,
+                        state.yanked.contains(&x.name),
+                        state.multi_select.contains(&x.name),
+                    );
 
-                    Row::new(vec![Cell::from(x.name), Cell::from(x.info)])
-                        .style(Style::default().bg(bg_color))
+                    Row::new(vec![Cell::from(formatted), Cell::from(x.info)])
+                        .style(Style::default())
                 })
                 .collect::<Vec<_>>(),
         )

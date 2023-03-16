@@ -24,7 +24,7 @@ pub struct State {
     pub mode: Mode,
 
     pub file_contents: Option<String>,
-    pub yanked: Vec<PathBuf>,
+    pub yanked: HashSet<PathBuf>,
     pub multi_select: HashSet<PathBuf>,
     pub error_message: Option<String>,
 }
@@ -43,13 +43,6 @@ impl fmt::Debug for State {
 }
 
 impl State {
-    pub fn try_up(&mut self) -> Result<(), FilmanError> {
-        let parent_index = self.selected_index_in_parent()?.unwrap_or(0);
-        self.pwd = self.pwd.parent().unwrap_or(&self.pwd).to_path_buf();
-        self.selected_in_pwd.insert(self.pwd.clone(), parent_index);
-        Ok(())
-    }
-
     pub fn path_of_selected(&self) -> Result<Option<PathBuf>, FilmanError> {
         let selected_index = self.selected_index_in_pwd();
         let files = self.files_in_pwd()?;
@@ -98,7 +91,7 @@ impl State {
         }
     }
 
-    pub fn sync_file_contents(&mut self) {
+    pub fn sync_preview_file(&mut self) {
         if let Ok(Some(path)) = self.path_of_selected() {
             self.file_contents = fs::read_to_string(path).ok();
         }

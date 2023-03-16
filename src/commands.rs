@@ -1,4 +1,4 @@
-use std::{path::Path, process::Command};
+use std::{path::Path, process::Command, collections::HashSet};
 
 use crate::{error::FilmanError, state::State};
 
@@ -49,11 +49,11 @@ fn yank(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
         ));
     }
 
-    state.yanked = vec![];
+    state.yanked = HashSet::new();
 
     for &arg in args.iter() {
         let path = state.pwd.join(arg);
-        state.yanked.push(path);
+        state.yanked.insert(path);
     }
 
     Ok(())
