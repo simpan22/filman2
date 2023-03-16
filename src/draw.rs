@@ -50,33 +50,43 @@ impl<'a> TryFrom<&'a State> for RenderState<'a> {
             Mode::ShellCommandMode(pr) => Some(pr.result().to_string()),
         };
 
-        Ok(RenderState {
-            files_in_pwd: other
+        let files_in_pwd = other
                 .files_in_pwd()?
                 .iter()
                 .map(|x| {
                     Ok(DirectoryEntry {
                         name: x.filename()?.to_string(),
-                        info: human_bytes::human_bytes(x.size()? as f64),
+                        info: human_bytes::human_bytes(x.size().unwrap_or(0) as f64),
                     })
                 })
-                .collect::<Result<Vec<_>, FilmanError>>()?,
-            selected_in_pwd: Some(other.selected_index_in_pwd()),
-            files_in_parent: other
+                .collect::<Result<Vec<_>, FilmanError>>()?;
+
+        let selected_in_pwd = Some(other.selected_index_in_pwd());
+
+        let files_in_parent = other
                 .files_in_parent()?
                 .iter()
                 .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
-                .collect(),
-            selected_in_parent: other.selected_index_in_parent()?,
-            command,
-            multi_select: other
+                .collect();
+        let selected_in_parent = other.selected_index_in_parent()?;
+        let multi_select = other
                 .multi_select
                 .iter()
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
-                .collect(),
+                .collect();
 
-            preview: other.file_contents.as_deref().unwrap_or("Binary file"),
-            error_message: other.error_message.as_deref(),
+        let preview = other.file_contents.as_deref().unwrap_or("Binary file");
+        let error_message = other.error_message.as_deref();
+
+        Ok(RenderState {
+            files_in_pwd,
+            selected_in_pwd,
+            files_in_parent,
+            selected_in_parent,
+            command,
+            multi_select,
+            preview,
+            error_message
         })
     }
 }
