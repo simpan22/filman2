@@ -15,11 +15,11 @@ struct TestContext {
 }
 
 impl TestContext {
-    fn new() -> Self {
+    fn new_with_test_dir(dir: PathBuf) -> TestContext {
         let pwd = std::env::current_dir().unwrap();
-        let test_dir = pwd.join("test_env");
-        if let Err(e) = remove_dir_all(test_dir.clone()) {
-            println!("Not removing old test env: {:?}", e);
+        let test_dir = pwd.join(dir);
+        if let Ok(_) = remove_dir_all(test_dir.clone()) {
+            eprintln!("Removing old test dir, this could happen if you have run the test suite but it failed to clean up (maybe some test failed).");
         }
         create_dir(test_dir.clone()).unwrap();
         let mut selected = HashMap::new();
@@ -42,6 +42,10 @@ impl TestContext {
             state: state,
             directory: test_dir,
         }
+    }
+
+    fn new() -> Self {
+        Self::new_with_test_dir("test_env".into())
     }
 }
 

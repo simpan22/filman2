@@ -2,6 +2,13 @@ use std::{collections::HashSet, path::Path, process::Command};
 
 use crate::{error::FilmanError, state::State};
 
+// TODO: Maybe we should have two kinds of commands:
+//   Type A: Commands that uses the selected selected index such as the
+//     cursor move commands.
+//   Type B: Commands that does not care what is selected but only acts 
+//     based on its arguments and pwd.
+
+// TODO: Rename should take two arguments and now worry about the selected state
 fn rename(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
     if args.len() != 1 {
         return Err(FilmanError::CommandError(
