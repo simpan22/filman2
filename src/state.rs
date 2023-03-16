@@ -86,10 +86,8 @@ impl State {
     }
 
     pub fn sync_file_contents(&mut self) {
-        if let Some(path) = self.path_of_selected().ok() {
-            if let Some(path) = path {
-                self.file_contents = fs::read_to_string(path).ok();
-            }
+        if let Ok(Some(path)) = self.path_of_selected() {
+            self.file_contents = fs::read_to_string(path).ok();
         }
     }
 }

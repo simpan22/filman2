@@ -20,7 +20,7 @@ fn rename(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
 }
 
 fn delete(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
-    if args.len() == 0 {
+    if args.is_empty() {
         return Err(FilmanError::CommandError(
             ":delete takes at least one argument".into(),
         ));
@@ -111,7 +111,7 @@ fn cursor_down(state: &mut State) -> Result<(), FilmanError> {
     let files_in_pwd = state.files_in_pwd()?;
 
     // Wrap around
-    let next_cursor_idx = if cursor_idx + 1 > files_in_pwd.len() {
+    let next_cursor_idx = if cursor_idx + 1 >= files_in_pwd.len() {
         0
     } else {
         cursor_idx + 1
@@ -127,7 +127,7 @@ fn cursor_up(state: &mut State) -> Result<(), FilmanError> {
     let files_in_pwd = state.files_in_pwd()?;
 
     // If empty directory don't do anything
-    if cursor_idx == 0 {
+    if files_in_pwd.is_empty() {
         return Ok(());
     }
 

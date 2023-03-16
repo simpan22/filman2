@@ -74,26 +74,26 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
         KeyCode::Char('q') => return vec![Action::Quit],
         KeyCode::Char('j') => {
             return vec![
-                Action::Command(format!(":cursor_down"))
+                Action::Command(":cursor_down".into())
             ]
         },
         KeyCode::Char('k') => {
             return vec![
-                Action::Command(format!(":cursor_up"))
+                Action::Command(":cursor_up".into())
             ]
         },
         KeyCode::Char('h') => {
             return vec![
-                Action::Command(format!(":cursor_ascend"))
+                Action::Command(":cursor_ascend".into())
             ]
         },
         KeyCode::Char('l') => {
             return vec![
-                Action::Command(format!(":cursor_descend"))
+                Action::Command(":cursor_descend".into())
             ]
         },
         KeyCode::Char('D') => {
-            let args = if state.multi_select.len() != 0 {
+            let args = if !state.multi_select.is_empty() {
                 state
                     .multi_select
                     .iter()
@@ -101,13 +101,11 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
                     .collect::<Result<Vec<&str>, _>>()
                     .unwrap()
                     .join(" ")
+            } else if let Ok(Some(filename)) = state.filename_of_selected() {
+                filename
             } else {
-                if let Ok(Some(filename)) = state.filename_of_selected() {
-                    filename
-                } else {
-                    state.error_message = Some("Faled to read filename".into());
-                    return vec![];
-                }
+                state.error_message = Some("Faled to read filename".into());
+                return vec![];
             };
             state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
                 &format!(":delete {}", args),
@@ -118,7 +116,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             if let Ok(Some(filename)) = state.filename_of_selected() {
                 return vec![
                     Action::Command(format!(":toggle_select {}", filename)),
-                    Action::Command(format!(":cursor_down"))
+                    Action::Command(":cursor_down".into())
                 ];
             } else {
                 state.error_message = Some("Faled to read filename".into());
@@ -206,13 +204,11 @@ fn main() -> Result<(), io::Error> {
         for action in actions {
             match action {
                 Action::Quit => break 'main,
-                Action::Command(cmd) => match execute_command(&cmd, &mut state) {
-                    Err(e) => state.error_message = Some(e.to_string()),
-                    _ => {}
+                Action::Command(cmd) => if let Err(e) = execute_command(&cmd, &mut state) {
+                    state.error_message = Some(e.to_string());
                 },
-                Action::ShellCommand(cmd) => match execute_shell_command(&cmd) {
-                    Err(e) => state.error_message = Some(e.to_string()),
-                    _ => {}
+                Action::ShellCommand(cmd) => if let Err(e) = execute_shell_command(&cmd) {
+                    state.error_message = Some(e.to_string());
                 },
                 Action::ModeSwitch(mode) => {
                     state.mode = mode;
