@@ -28,6 +28,9 @@ pub enum FilmanError {
     PathHasNoFilename,
 
     #[error("Directory has no files")]
-    EmptyDirectory
+    EmptyDirectory,
+
+    #[error("Not a directory")]
+    NotADirectory
 }
 

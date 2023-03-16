@@ -72,18 +72,26 @@ fn command_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Action> 
 fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
     match key.code {
         KeyCode::Char('q') => return vec![Action::Quit],
-        KeyCode::Char('j') => state.try_next().unwrap_or_else(|_| {
-            state.error_message = Some("Failed to navigate".into());
-        }),
-        KeyCode::Char('k') => state.try_prev().unwrap_or_else(|_| {
-            state.error_message = Some("Faled to navigate".into());
-        }),
-        KeyCode::Char('h') => state.try_up().unwrap_or_else(|_| {
-            state.error_message = Some("Failed to go to parent dir".into());
-        }),
-        KeyCode::Char('l') => state.try_down().unwrap_or_else(|_| {
-            state.error_message = Some("Failed to go into directory".into());
-        }),
+        KeyCode::Char('j') => {
+            return vec![
+                Action::Command(format!(":cursor_down"))
+            ]
+        },
+        KeyCode::Char('k') => {
+            return vec![
+                Action::Command(format!(":cursor_up"))
+            ]
+        },
+        KeyCode::Char('h') => {
+            return vec![
+                Action::Command(format!(":cursor_ascend"))
+            ]
+        },
+        KeyCode::Char('l') => {
+            return vec![
+                Action::Command(format!(":cursor_descend"))
+            ]
+        },
         KeyCode::Char('D') => {
             let args = if state.multi_select.len() != 0 {
                 state
@@ -108,10 +116,10 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
         }
         KeyCode::Char(' ') => {
             if let Ok(Some(filename)) = state.filename_of_selected() {
-                state.try_next().unwrap_or_else(|_| {
-                    state.error_message = Some("Failed to advance cursor".into())
-                });
-                return vec![Action::Command(format!(":toggle_select {}", filename))];
+                return vec![
+                    Action::Command(format!(":toggle_select {}", filename)),
+                    Action::Command(format!(":cursor_down"))
+                ];
             } else {
                 state.error_message = Some("Faled to read filename".into());
             }

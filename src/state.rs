@@ -29,32 +29,6 @@ pub struct State {
 }
 
 impl State {
-    pub fn try_next(&mut self) -> Result<(), FilmanError> {
-        let current = self.selected_index_in_pwd();
-        if !self.files_in_pwd()?.is_empty() && current != self.files_in_pwd()?.len() - 1 {
-            self.selected_in_pwd.insert(self.pwd.clone(), current + 1);
-        }
-        Ok(())
-    }
-
-    pub fn try_prev(&mut self) -> Result<(), FilmanError> {
-        let current = self.selected_index_in_pwd();
-        if !self.files_in_pwd()?.is_empty() && current != 0 {
-            self.selected_in_pwd.insert(self.pwd.clone(), current - 1);
-        }
-        Ok(())
-    }
-
-    pub fn try_down(&mut self) -> Result<(), FilmanError> {
-        if let Some(selected_path) = self.path_of_selected()? {
-            if selected_path.is_dir() {
-                self.pwd = selected_path;
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn try_up(&mut self) -> Result<(), FilmanError> {
         let parent_index = self.selected_index_in_parent()?.unwrap_or(0);
         self.pwd = self.pwd.parent().unwrap_or(&self.pwd).to_path_buf();
