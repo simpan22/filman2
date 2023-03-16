@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{process::Command, path::Path};
 
 use crate::{error::FilmanError, state::State};
 
@@ -198,12 +198,13 @@ pub fn execute_command(cmd: &str, state: &mut State) -> Result<(), FilmanError> 
     Ok(())
 }
 
-pub fn execute_shell_command(cmd: &str) -> Result<(), FilmanError> {
+pub fn execute_shell_command(cmd: &str, pwd: &Path) -> Result<(), FilmanError> {
     let split_cmd = cmd.split(' ').collect::<Vec<&str>>();
     if let Some((&cmd_name, args)) = split_cmd.split_first() {
         let mut chars = cmd_name.chars();
         chars.next();
         Command::new(chars.as_str())
+            .current_dir(pwd)
             .args(args)
             .output()
             .map_err(|e| FilmanError::ShellCommandError(e.to_string()))?;

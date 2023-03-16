@@ -123,12 +123,22 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             }
         }
         KeyCode::Char('y') => {
-            if let Ok(Some(filename)) = state.filename_of_selected() {
-                // TODO: If multiselect yank with all selected as arguments
-                return vec![Action::Command(format!(":yank {}", filename))];
+            let args = if !state.multi_select.is_empty() {
+                state
+                    .multi_select
+                    .iter()
+                    .map(|x| x.full_path_str())
+                    .collect::<Result<Vec<&str>, _>>()
+                    .unwrap()
+                    .join(" ")
+            } else if let Ok(Some(filename)) = state.filename_of_selected() {
+                filename
             } else {
-                state.error_message = Some("Faled to read filename".into());
-            }
+                state.error_message = Some("No files seem to be selected".into());
+                return vec![];
+            };
+
+            return vec![Action::Command(format!(":yank {}", args))];
         }
         KeyCode::Char('p') => {
             return vec![Action::Command(":paste".into())];
@@ -207,7 +217,7 @@ fn main() -> Result<(), io::Error> {
                 Action::Command(cmd) => if let Err(e) = execute_command(&cmd, &mut state) {
                     state.error_message = Some(e.to_string());
                 },
-                Action::ShellCommand(cmd) => if let Err(e) = execute_shell_command(&cmd) {
+                Action::ShellCommand(cmd) => if let Err(e) = execute_shell_command(&cmd, &state.pwd) {
                     state.error_message = Some(e.to_string());
                 },
                 Action::ModeSwitch(mode) => {
