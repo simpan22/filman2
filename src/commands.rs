@@ -1,4 +1,4 @@
-use std::{path::Path, process::Command, collections::HashSet};
+use std::{collections::HashSet, path::Path, process::Command};
 
 use crate::{error::FilmanError, state::State};
 

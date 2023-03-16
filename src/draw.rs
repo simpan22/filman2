@@ -16,7 +16,7 @@ use tui::{
 use crate::error::FilmanError;
 use crate::path::Path;
 use crate::state::Mode;
-use crate::State;
+use crate::state::State;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct DirectoryEntry {

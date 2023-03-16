@@ -11,3 +11,4 @@ crossterm = "0.25"
 prompter = { git = "ssh://git@github.com/simpan22/prompter.git" }
 thiserror = "1.0.38"
 human_bytes = "0.4.1"
+serial_test = "1.0.0"

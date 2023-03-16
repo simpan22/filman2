@@ -1,17 +1,11 @@
-mod commands;
-mod draw;
-mod error;
-mod path;
-pub mod state;
-
-use commands::{execute_command, execute_shell_command};
 use crossterm::{
     event::{read, DisableMouseCapture, Event, KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
-use draw::{create_terminal, draw, RenderState};
-use path::Path;
+use filman2::commands::{execute_command, execute_shell_command};
+use filman2::draw::{create_terminal, draw, RenderState};
+use filman2::path::Path;
 use prompter::PromptReader;
 
 use std::{
@@ -19,7 +13,7 @@ use std::{
     io,
 };
 
-use state::{Mode, State};
+use filman2::state::{Mode, State};
 
 enum Action {
     ShellCommand(String),
@@ -167,7 +161,7 @@ fn main() -> Result<(), io::Error> {
     let mut state = State {
         pwd,
         selected_in_pwd: selected,
-        mode: state::Mode::NormalMode,
+        mode: filman2::state::Mode::NormalMode,
         yanked: HashSet::new(),
         multi_select: HashSet::new(),
         error_message: None,

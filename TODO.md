@@ -7,3 +7,6 @@
  - Custom command for preview windows
  - Custom command for file size info
  - Scroll in preview window
+
+# Tests
+
