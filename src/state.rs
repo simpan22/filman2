@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -16,7 +17,7 @@ pub enum Mode {
     ShellCommandMode(PromptReader),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct State {
     pub pwd: PathBuf,
     pub selected_in_pwd: HashMap<PathBuf, usize>,
@@ -26,6 +27,19 @@ pub struct State {
     pub yanked: Vec<PathBuf>,
     pub multi_select: HashSet<PathBuf>,
     pub error_message: Option<String>,
+}
+
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("State")
+            .field("pwd", &self.pwd)
+            .field("selected_in_pwd", &self.selected_in_pwd)
+            .field("mode", &self.mode)
+            .field("yanked", &self.yanked)
+            .field("multi_select", &self.multi_select)
+            .field("error_message", &self.error_message)
+            .finish()
+    }
 }
 
 impl State {
@@ -41,7 +55,7 @@ impl State {
         let files = self.files_in_pwd()?;
 
         if selected_index >= files.len() {
-            return Ok(None)
+            return Ok(None);
         }
 
         Ok(Some(files[selected_index].clone()))
@@ -77,7 +91,6 @@ impl State {
     }
 
     pub fn filename_of_selected(&self) -> Result<Option<String>, FilmanError> {
-        
         if let Some(path_of_selected) = self.path_of_selected()? {
             Ok(Some(path_of_selected.filename()?.to_string()))
         } else {
