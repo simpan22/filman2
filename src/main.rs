@@ -72,26 +72,10 @@ fn command_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Action> 
 fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
     match key.code {
         KeyCode::Char('q') => return vec![Action::Quit],
-        KeyCode::Char('j') => {
-            return vec![
-                Action::Command(":cursor_down".into())
-            ]
-        },
-        KeyCode::Char('k') => {
-            return vec![
-                Action::Command(":cursor_up".into())
-            ]
-        },
-        KeyCode::Char('h') => {
-            return vec![
-                Action::Command(":cursor_ascend".into())
-            ]
-        },
-        KeyCode::Char('l') => {
-            return vec![
-                Action::Command(":cursor_descend".into())
-            ]
-        },
+        KeyCode::Char('j') => return vec![Action::Command(":cursor_down".into())],
+        KeyCode::Char('k') => return vec![Action::Command(":cursor_up".into())],
+        KeyCode::Char('h') => return vec![Action::Command(":cursor_ascend".into())],
+        KeyCode::Char('l') => return vec![Action::Command(":cursor_descend".into())],
         KeyCode::Char('D') => {
             let args = if !state.multi_select.is_empty() {
                 state
@@ -116,7 +100,7 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
             if let Ok(Some(filename)) = state.filename_of_selected() {
                 return vec![
                     Action::Command(format!(":toggle_select {}", filename)),
-                    Action::Command(":cursor_down".into())
+                    Action::Command(":cursor_down".into()),
                 ];
             } else {
                 state.error_message = Some("Faled to read filename".into());
@@ -138,7 +122,10 @@ fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
                 return vec![];
             };
 
-            return vec![Action::Command(format!(":yank {}", args))];
+            return vec![
+                Action::Command(format!(":yank {}", args)),
+                Action::Command(":clear_selection".into()),
+            ];
         }
         KeyCode::Char('p') => {
             return vec![Action::Command(":paste".into())];
@@ -214,12 +201,16 @@ fn main() -> Result<(), io::Error> {
         for action in actions {
             match action {
                 Action::Quit => break 'main,
-                Action::Command(cmd) => if let Err(e) = execute_command(&cmd, &mut state) {
-                    state.error_message = Some(e.to_string());
-                },
-                Action::ShellCommand(cmd) => if let Err(e) = execute_shell_command(&cmd, &state.pwd) {
-                    state.error_message = Some(e.to_string());
-                },
+                Action::Command(cmd) => {
+                    if let Err(e) = execute_command(&cmd, &mut state) {
+                        state.error_message = Some(e.to_string());
+                    }
+                }
+                Action::ShellCommand(cmd) => {
+                    if let Err(e) = execute_shell_command(&cmd, &state.pwd) {
+                        state.error_message = Some(e.to_string());
+                    }
+                }
                 Action::ModeSwitch(mode) => {
                     state.mode = mode;
                 }

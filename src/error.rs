@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-
 #[derive(Error, Debug)]
 pub enum FilmanError {
     #[error("Error executing filman command: {0}")]
@@ -31,6 +30,5 @@ pub enum FilmanError {
     EmptyDirectory,
 
     #[error("Not a directory")]
-    NotADirectory
+    NotADirectory,
 }
-

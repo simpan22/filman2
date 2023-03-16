@@ -1,4 +1,4 @@
-use std::{process::Command, path::Path};
+use std::{path::Path, process::Command};
 
 use crate::{error::FilmanError, state::State};
 
@@ -106,6 +106,10 @@ fn toggle_select(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
     Ok(())
 }
 
+fn clear_selection(state: &mut State) {
+    state.multi_select.clear()
+}
+
 fn cursor_down(state: &mut State) -> Result<(), FilmanError> {
     let cursor_idx = state.selected_index_in_pwd();
     let files_in_pwd = state.files_in_pwd()?;
@@ -156,15 +160,23 @@ fn cursor_descend(state: &mut State) -> Result<(), FilmanError> {
 }
 
 fn cursor_ascend(state: &mut State) -> Result<(), FilmanError> {
-    let new_selected_index = state.selected_index_in_parent()?.ok_or(FilmanError::NoParentError)?;
-    state.pwd = state.pwd.parent().ok_or(FilmanError::NoParentError)?.to_path_buf();
+    let new_selected_index = state
+        .selected_index_in_parent()?
+        .ok_or(FilmanError::NoParentError)?;
+    state.pwd = state
+        .pwd
+        .parent()
+        .ok_or(FilmanError::NoParentError)?
+        .to_path_buf();
     let files_in_new_pwd = state.files_in_pwd()?;
 
     // Update cursor in new directory handling the case when parent has changed
     if new_selected_index >= files_in_new_pwd.len() {
         state.selected_in_pwd.insert(state.pwd.clone(), 0);
     } else {
-        state.selected_in_pwd.insert(state.pwd.clone(), new_selected_index);
+        state
+            .selected_in_pwd
+            .insert(state.pwd.clone(), new_selected_index);
     }
     Ok(())
 }
@@ -183,6 +195,7 @@ pub fn execute_command(cmd: &str, state: &mut State) -> Result<(), FilmanError> 
             ":cursor_up" => cursor_up(state)?,
             ":cursor_ascend" => cursor_ascend(state)?,
             ":cursor_descend" => cursor_descend(state)?,
+            ":clear_selection" => clear_selection(state),
             _ => {
                 return Err(FilmanError::CommandError(format!(
                     "Unrecognized command {cmd}"

@@ -51,29 +51,29 @@ impl<'a> TryFrom<&'a State> for RenderState<'a> {
         };
 
         let files_in_pwd = other
-                .files_in_pwd()?
-                .iter()
-                .map(|x| {
-                    Ok(DirectoryEntry {
-                        name: x.filename()?.to_string(),
-                        info: human_bytes::human_bytes(x.size().unwrap_or(0) as f64),
-                    })
+            .files_in_pwd()?
+            .iter()
+            .map(|x| {
+                Ok(DirectoryEntry {
+                    name: x.filename()?.to_string(),
+                    info: human_bytes::human_bytes(x.size().unwrap_or(0) as f64),
                 })
-                .collect::<Result<Vec<_>, FilmanError>>()?;
+            })
+            .collect::<Result<Vec<_>, FilmanError>>()?;
 
         let selected_in_pwd = Some(other.selected_index_in_pwd());
 
         let files_in_parent = other
-                .files_in_parent()?
-                .iter()
-                .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
-                .collect();
+            .files_in_parent()?
+            .iter()
+            .map(|x| x.file_name().unwrap().to_str().unwrap().to_string())
+            .collect();
         let selected_in_parent = other.selected_index_in_parent()?;
         let multi_select = other
-                .multi_select
-                .iter()
-                .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
-                .collect();
+            .multi_select
+            .iter()
+            .map(|p| p.file_name().unwrap().to_str().unwrap().to_string())
+            .collect();
 
         let preview = other.file_contents.as_deref().unwrap_or("Binary file");
         let error_message = other.error_message.as_deref();
@@ -86,7 +86,7 @@ impl<'a> TryFrom<&'a State> for RenderState<'a> {
             command,
             multi_select,
             preview,
-            error_message
+            error_message,
         })
     }
 }
