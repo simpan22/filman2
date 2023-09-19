@@ -8,7 +8,7 @@ use crate::{error::FilmanError, state::State};
 //   Type B: Commands that does not care what is selected but only acts 
 //     based on its arguments and pwd.
 
-// TODO: Rename should take two arguments and now worry about the selected state
+// TODO: Rename should take two arguments and not worry about the selected state
 fn rename(args: &[&str], state: &mut State) -> Result<(), FilmanError> {
     if args.len() != 1 {
         return Err(FilmanError::CommandError(

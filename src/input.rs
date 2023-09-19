@@ -1,8 +1,35 @@
+use std::collections::HashMap;
+
+use crate::config::Config;
 use crate::path::Path;
 use crate::state::{Mode, State};
 use crossterm::event::{KeyCode, KeyEvent};
+use lazy_static::lazy_static;
 use prompter::PromptReader;
 
+lazy_static! {
+    static ref KEYBINDINGS: HashMap<char, Vec<Action>> = {
+        let mut keymap = HashMap::new();
+        keymap.insert('q', vec![Action::Quit]);
+        keymap.insert(
+            ':',
+            vec![Action::ModeSwitch(Mode::CommandMode(
+                PromptReader::new_with_placeholder(":", None),
+            ))],
+        );
+        keymap.insert(
+            '!',
+            vec![Action::ModeSwitch(Mode::ShellCommandMode(
+                PromptReader::new_with_placeholder("!", None),
+            ))],
+        );
+        let config = Config::new("config.json".into());
+        let keys = config.simple_keymap_actions();
+        keymap.extend(keys.into_iter());
+        keymap
+    };
+}
+#[derive(Clone)]
 pub enum Action {
     ShellCommand(String),
     Command(String),
@@ -56,86 +83,56 @@ pub fn command_mode_input(key: &KeyEvent, reader: &mut PromptReader) -> Vec<Acti
 
 pub fn normal_mode_input(key: &KeyEvent, state: &mut State) -> Vec<Action> {
     match key.code {
-        KeyCode::Char('q') => return vec![Action::Quit],
-        KeyCode::Char('j') => return vec![Action::Command(":cursor_down".into())],
-        KeyCode::Char('k') => return vec![Action::Command(":cursor_up".into())],
-        KeyCode::Char('h') => return vec![Action::Command(":cursor_ascend".into())],
-        KeyCode::Char('l') => return vec![Action::Command(":cursor_descend".into())],
-        KeyCode::Char('D') => {
-            let args = if !state.multi_select.is_empty() {
-                state
-                    .multi_select
-                    .iter()
-                    .filter(|p| p.parent() == Some(&state.pwd))
-                    .map(|x| x.full_path_str())
-                    .collect::<Result<Vec<&str>, _>>()
-                    .unwrap()
-                    .join(" ")
-            } else if let Ok(Some(filename)) = state.filename_of_selected() {
-                filename
-            } else {
-                state.error_message = Some("Faled to read filename".into());
-                return vec![];
-            };
-            state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
-                &format!(":delete {}", args),
-                None,
-            ))
-        }
         KeyCode::Char(' ') => {
-            if let Ok(Some(filename)) = state.filename_of_selected() {
-                return vec![
+            if let Some(filename) = state.filename_of_selected() {
+                vec![
                     Action::Command(format!(":toggle_select {}", filename)),
                     Action::Command(":cursor_down".into()),
-                ];
+                ]
             } else {
                 state.error_message = Some("Faled to read filename".into());
+                vec![]
             }
+        }
+        KeyCode::Char('D') => {
+            let args = state
+                .multi_select_or_selected()
+                .iter()
+                .map(|x| x.full_path_str().unwrap())
+                .collect::<Vec<&str>>()
+                .join(" ");
+            vec![Action::ModeSwitch(Mode::CommandMode(
+                PromptReader::new_with_placeholder(&format!(":delete {}", args), None),
+            ))]
         }
         KeyCode::Char('y') => {
-            let args = if !state.multi_select.is_empty() {
-                state
-                    .multi_select
-                    .iter()
-                    .filter(|p| p.parent() == Some(&state.pwd))
-                    .map(|x| x.full_path_str())
-                    .collect::<Result<Vec<&str>, _>>()
-                    .unwrap()
-                    .join(" ")
-            } else if let Ok(Some(filename)) = state.filename_of_selected() {
-                filename
-            } else {
-                state.error_message = Some("No files seem to be selected".into());
-                return vec![];
-            };
-
-            return vec![
+            let args = state
+                .multi_select_or_selected()
+                .iter()
+                .map(|x| x.full_path_str().unwrap())
+                .collect::<Vec<&str>>()
+                .join(" ");
+            vec![
                 Action::Command(format!(":yank {}", args)),
                 Action::Command(":clear_selection".into()),
-            ];
-        }
-        KeyCode::Char('p') => {
-            return vec![Action::Command(":paste".into())];
+            ]
         }
         KeyCode::Char('A') => {
-            if let Ok(Some(filename)) = state.filename_of_selected() {
-                state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(
-                    &format!(":rename {}", filename),
-                    None,
-                ))
+            if let Some(filename) = state.filename_of_selected() {
+                vec![Action::ModeSwitch(Mode::CommandMode(
+                    PromptReader::new_with_placeholder(&format!(":rename {}", filename), None),
+                ))]
             } else {
                 state.error_message = Some("Faled to read filename".into());
+                vec![]
             }
         }
-        KeyCode::Char(':') => {
-            state.mode = Mode::CommandMode(PromptReader::new_with_placeholder(":", None))
-        }
-        KeyCode::Char('!') => {
-            state.mode = Mode::ShellCommandMode(PromptReader::new_with_placeholder("!", None))
-        }
 
-        _ => {}
-    };
+        KeyCode::Char(c) => custom_simple_binding(c),
+        _ => vec![],
+    }
+}
 
-    vec![]
+fn custom_simple_binding(c: char) -> Vec<Action> {
+    KEYBINDINGS.get(&c).cloned().unwrap_or(vec![])
 }

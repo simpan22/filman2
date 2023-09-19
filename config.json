@@ -1,0 +1,11 @@
+{
+    "keys": {
+        "simple": {
+            "j": ":cursor_down",
+            "k": ":cursor_up",
+            "h": ":cursor_ascend",
+            "l": ":cursor_descend",
+            "p": ":paste"
+        }
+    }
+}
