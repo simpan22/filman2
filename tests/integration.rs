@@ -39,7 +39,7 @@ impl TestContext {
         assert!(state.files_in_pwd().unwrap().is_empty());
 
         TestContext {
-            state: state,
+            state,
             directory: test_dir,
         }
     }

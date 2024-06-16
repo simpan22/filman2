@@ -45,6 +45,8 @@ fn main() -> Result<(), io::Error> {
 
         let mut actions = vec![];
 
+        // Every keypress is an input event and can generate 
+        // zero or more actions.
         if let Event::Key(key) = read()? {
             state.error_message = None;
             match &mut state.mode {
@@ -55,7 +57,7 @@ fn main() -> Result<(), io::Error> {
                     actions.append(&mut command_mode_input(&key, reader));
                 }
                 Mode::NormalMode => {
-                    actions.append(&mut normal_mode_input(&key, &mut state));
+                    actions.append(&mut normal_mode_input(&key, &state));
                 }
             }
         }
@@ -76,6 +78,9 @@ fn main() -> Result<(), io::Error> {
                 }
                 Action::ModeSwitch(mode) => {
                     state.mode = mode;
+                },
+                Action::SetErrorMessage(message) => {
+                    state.error_message = Some(message)
                 }
             }
         }
