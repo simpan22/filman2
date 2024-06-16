@@ -83,17 +83,45 @@ impl State {
             .collect::<std::io::Result<Vec<PathBuf>>>()?)
     }
 
-    pub fn filename_of_selected(&self) -> Result<Option<String>, FilmanError> {
-        if let Some(path_of_selected) = self.path_of_selected()? {
-            Ok(Some(path_of_selected.filename()?.to_string()))
-        } else {
-            Ok(None)
+    pub fn filename_of_selected(&self) -> Result<String, FilmanError> {
+        match self.path_of_selected()? {
+            Some(path) => Ok(path.filename().unwrap().to_string()),
+            None => Err(FilmanError::NoFileSelectedError),
         }
     }
 
     pub fn sync_preview_file(&mut self) {
         if let Ok(Some(path)) = self.path_of_selected() {
-            self.file_contents = fs::read_to_string(path).ok();
+            if let Ok(metadata) = fs::metadata(path.clone()) {
+                if metadata.len() < 2048 {
+                    self.file_contents = fs::read_to_string(path).ok();
+                    return;
+                }
+            }
+            self.file_contents = None;
+        }
+    }
+
+    pub fn multiselected_in_pwd(&self) -> HashSet<PathBuf> {
+        self.multi_select
+            .iter()
+            .filter(|p| p.parent() == Some(&self.pwd))
+            .cloned()
+            .collect()
+    }
+
+    pub fn multi_select_or_selected(&self) -> Result<HashSet<PathBuf>, FilmanError> {
+        if !self.multi_select.is_empty() {
+            Ok(self.multiselected_in_pwd())
+        } else {
+            match self.path_of_selected()? {
+                Some(filename) => {
+                    let mut ret = HashSet::new();
+                    ret.insert(filename);
+                    Ok(ret)
+                }
+                None => Err(FilmanError::NoFileSelectedError) 
+            }
         }
     }
 }

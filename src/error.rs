@@ -31,4 +31,7 @@ pub enum FilmanError {
 
     #[error("Not a directory")]
     NotADirectory,
+
+    #[error("No selected file")]
+    NoFileSelectedError,
 }
